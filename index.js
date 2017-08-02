@@ -1,28 +1,18 @@
-class User {
-    construct(id, sid) {
-        this.id = id;
-        this.sid = [sid];
-        this.connections = 1;
+function addConnection(index, sid) {
+    onlineUsers[index].sids.push(sid);
+    onlineUsers[index].connections++;
+}
 
-        return this;
+function removeConnection(index, sid) {
+    let sidIndex = onlineUsers[index].sids.indexOf(sid);
+    if (sidIndex != -1) {
+        onlineUsers[index].sids.splice(sidIndex, sid);
+        onlineUsers[index].connections--;
     }
-
-    addConnection(sid) {
-        this.connections += 1;
-        return this.sid.push(sid);
-    }
-
-    removeConnection(sid) {
-        let index = this.sid.findIndex(sidParam => sidParam == sid);
-        return this.sid.splice(index, 1);
-    }
-
 }
 
 const express = require('express');
 const app = express();
-
-
 const http = require('http').Server(app).listen(5000);
 const io = require('socket.io')(http);
 
@@ -44,17 +34,17 @@ io.on('connection', function(socket) {
         let index = onlineUsers.findIndex(obj => obj.id == data.id),
             msg = '';
         if (index != -1) {
-            onlineUsers[index].addConnection(data.sid);
+            addConnection(index, data.sid);
             msg = 'Added new connection';
         } else {
-            let user = new User(data.id, data.sid);
-            onlineUsers.push(user);
+            onlineUsers.push({
+                id: data.id,
+                sids: [data.sid],
+                connections: 1,
+            });
             // console.log(onlineUsers);
             msg = `Registered new online User with id ${data.id}`;
         }
-        console.log('sendingSuccess');
-        console.log(data.sid);
-        console.log(socket.rooms);
         io.sockets.to(data.sid).emit('successfulRegistration', {
             message: msg,
             users: onlineUsers,
@@ -64,9 +54,10 @@ io.on('connection', function(socket) {
     socket.on('closePage', (data) => {
         let index = onlineUsers.findIndex(obj => obj.id == data.id);
         if (onlineUsers[index] && onlineUsers[index].connections > 1) {
-            onlineUsers[index].removeConnection(data.sid);
+            removeConnection(index, data.sid);
+        } else {
+            onlineUsers.splice(index, 1);
         }
-        console.log(onlineUsers);
     });
 
 });
